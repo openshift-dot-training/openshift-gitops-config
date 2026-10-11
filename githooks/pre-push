@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# githooks/pre-push
+#  - local guard for the default branch (GitHub branch protection needs a paid
+#    plan for private repos): refuses deleting main and non-fast-forward
+#    (force) pushes to main
+#  - re-scans every pushed commit for real environment data, which also
+#    catches commits made with --no-verify
+#
+# Enable once per clone:  git config core.hooksPath githooks
+# Bypass deliberately (e.g. an agreed history rewrite): git push --no-verify
+set -euo pipefail
+root="$(git rev-parse --show-toplevel)"
+protected="refs/heads/main"
+zero=0000000000000000000000000000000000000000
+remote="$1"
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [[ $local_sha == "$zero" ]] && {
+    [[ $remote_ref == "$protected" ]] && { echo "pre-push: refusing to delete $protected" >&2; exit 1; }
+    continue
+  }
+  if [[ $remote_ref == "$protected" && $remote_sha != "$zero" ]] &&
+     ! git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
+    echo "pre-push: refusing non-fast-forward (force) push to $protected" >&2; exit 1
+  fi
+  # Range to scan: what the remote does not have yet.
+  if [[ $remote_sha != "$zero" ]] && git cat-file -e "$remote_sha" 2>/dev/null; then
+    base=$remote_sha
+  else
+    base=$(git merge-base "$local_sha" "$remote/main" 2>/dev/null || git hash-object -t tree /dev/null)
+  fi
+  "$root/scripts/check-sensitive.sh" --range "$base..$local_sha"
+  for c in $(git rev-list "$base..$local_sha" 2>/dev/null || git rev-list "$local_sha"); do
+    msg=$(mktemp); git log -1 --format=%B "$c" >"$msg"
+    "$root/scripts/check-sensitive.sh" --file "$msg" || { rm -f "$msg"; echo "pre-push: commit message of ${c:0:7}" >&2; exit 1; }
+    rm -f "$msg"
+  done
+done
+exit 0

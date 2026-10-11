@@ -1,0 +1,28 @@
+# group-a: every cluster gets a 3-replica internal-mode StorageCluster.
+# Device class / size can be overridden per cluster in clusters/<cluster>/values/odf.yaml.
+storageCluster:
+  storageSize: 2Ti
+  storageClassName: gp3-csi
+
+extraObjects:
+  - apiVersion: ocs.openshift.io/v1
+    kind: StorageCluster
+    metadata:
+      name: ocs-storagecluster
+      namespace: openshift-storage
+    spec:
+      manageNodes: false
+      monDataDirHostPath: /var/lib/rook
+      storageDeviceSets:
+        - name: ocs-deviceset
+          count: 1
+          replica: 3
+          portable: true
+          dataPVCTemplate:
+            spec:
+              accessModes: [ReadWriteOnce]
+              volumeMode: Block
+              storageClassName: '{{ .Values.storageCluster.storageClassName }}'
+              resources:
+                requests:
+                  storage: '{{ .Values.storageCluster.storageSize }}'

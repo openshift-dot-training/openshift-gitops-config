@@ -1,0 +1,39 @@
+# ACM (hub clusters only). Versions are NOT set here - see components/versions.yaml.
+#
+# ACM installs the multicluster engine (MCE) itself: when the MultiClusterHub
+# is created, the ACM operator creates the multicluster-engine Subscription in
+# the multicluster-engine namespace. That InstallPlan is outside this
+# namespace, so approver.extra adds a second approver there, pinned to
+# versions.acm.mceVersion. The MCE version is tied to the ACM version
+# (ACM 2.12 <-> MCE 2.7): always change both together.
+operatorGroup:
+  targetNamespaces:
+    - open-cluster-management
+subscription:
+  name: advanced-cluster-management
+
+approver:
+  extra:
+    - namespace: multicluster-engine
+      subscription: multicluster-engine
+      versionKey: mceVersion
+      channelKey: mceChannel    # read by olm-upgrade-analyzer's GitOps export
+      csvFormat: multicluster-engine.v%s
+      createNamespace: true
+
+extraObjects:
+  - apiVersion: operator.open-cluster-management.io/v1
+    kind: MultiClusterHub
+    metadata:
+      name: multiclusterhub
+      namespace: open-cluster-management
+      annotations:
+        # Subscription spec ACM uses for MCE: same catalog, Manual approval,
+        # first install exactly on the pinned MCE version. Verify this
+        # annotation against the ACM documentation for your version.
+        installer.open-cluster-management.io/mce-subscription-spec: >-
+          {"source": "{{ .Values.subscription.source }}",
+          "channel": "{{ .Values.versions.acm.mceChannel }}",
+          "installPlanApproval": "Manual",
+          "startingCSV": "multicluster-engine.v{{ .Values.versions.acm.mceVersion }}"}
+    spec: {}

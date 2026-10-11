@@ -1,0 +1,32 @@
+# Allow the openshift-gitops application controller (hub) to manage the ACM
+# objects rendered by the platform-catalog hub chart.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: platform-gitops-acm
+rules:
+  - apiGroups: ["policy.open-cluster-management.io"]
+    resources: ["policies", "placementbindings", "policysets"]
+    verbs: ["*"]
+  - apiGroups: ["cluster.open-cluster-management.io"]
+    resources: ["placements"]
+    verbs: ["*"]
+  - apiGroups: ["cluster.open-cluster-management.io"]
+    resources: ["placementdecisions", "managedclusters", "managedclustersets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["argoproj.io"]
+    resources: ["applicationsets", "applications", "appprojects"]
+    verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: platform-gitops-acm
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: platform-gitops-acm
+subjects:
+  - kind: ServiceAccount
+    name: openshift-gitops-argocd-application-controller
+    namespace: openshift-gitops

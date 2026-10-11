@@ -1,0 +1,11 @@
+# Component defaults (lowest precedence after the chart).
+# Versions (channel, startingCSV, installPlanApproval) are NOT set here: see
+# components/versions.yaml, group-values/<group>/versions.yaml and
+# clusters/<cluster>/main-values.yaml (versions: block).
+namespace:
+  labels:
+    openshift.io/cluster-monitoring: "true"
+operatorGroup:
+  targetNamespaces: []        # Logging 6.x: AllNamespaces
+subscription:
+  name: cluster-logging

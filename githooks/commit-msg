@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# githooks/commit-msg - commit messages follow the same placeholder rule as
+# files: no internal hostnames, IPs or credentials.
+set -euo pipefail
+"$(git rev-parse --show-toplevel)/scripts/check-sensitive.sh" --file "$1"

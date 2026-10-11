@@ -1,0 +1,20 @@
+# LokiStack for this cluster. The object storage secret is cluster specific
+# (create it out of band or with an external-secrets manifest).
+extraObjects:
+  - apiVersion: loki.grafana.com/v1
+    kind: LokiStack
+    metadata:
+      name: logging-loki
+      namespace: openshift-logging
+    spec:
+      size: 1x.small
+      storage:
+        schemas:
+          - version: v13
+            effectiveDate: "2024-10-01"
+        secret:
+          name: logging-loki-s3
+          type: s3
+      storageClassName: gp3-csi
+      tenants:
+        mode: openshift-logging

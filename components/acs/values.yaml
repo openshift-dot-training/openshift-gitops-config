@@ -1,0 +1,8 @@
+# Component defaults (lowest precedence after the chart).
+# Versions (channel, startingCSV, installPlanApproval) are NOT set here: see
+# components/versions.yaml, group-values/<group>/versions.yaml and
+# clusters/<cluster>/main-values.yaml (versions: block).
+operatorGroup:
+  targetNamespaces: []
+subscription:
+  name: rhacs-operator

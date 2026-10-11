@@ -1,0 +1,4 @@
+# group-a operator versions. Only list what differs from components/versions.yaml.
+# A cluster can still override any of these in clusters/<cluster>/main-values.yaml.
+versions:
+  acs: { channel: stable, version: 4.7.3 }

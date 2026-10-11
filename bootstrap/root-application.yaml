@@ -1,0 +1,29 @@
+# The only Application created by hand. It renders the platform-catalog hub
+# chart from openshift-gitops-charts (at the tag in catalog.yaml ->
+# repos.charts.version) with catalog.yaml and groups.yaml from this repository,
+# and keeps the ApplicationSets and ACM policies in sync with Git.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-catalog
+  namespace: openshift-gitops
+spec:
+  project: platform-hub
+  sources:
+    - repoURL: https://git.example.com/CHANGE-ME/openshift-gitops-config.git
+      targetRevision: main
+      ref: config
+    - repoURL: https://git.example.com/CHANGE-ME/openshift-gitops-charts.git
+      targetRevision: v0.1.0          # keep equal to catalog.yaml repos.charts.version
+      path: charts/platform-catalog
+      helm:
+        valueFiles:
+          - $config/catalog.yaml
+          - $config/groups.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-gitops
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

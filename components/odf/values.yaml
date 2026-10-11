@@ -1,0 +1,39 @@
+# Component defaults (lowest precedence after the chart).
+# Versions (channel, startingCSV, installPlanApproval) are NOT set here: see
+# components/versions.yaml, group-values/<group>/versions.yaml and
+# clusters/<cluster>/main-values.yaml (versions: block).
+namespace:
+  labels:
+    openshift.io/cluster-monitoring: "true"
+operatorGroup:
+  targetNamespaces:
+    - openshift-storage
+subscription:
+  name: odf-operator
+  csvFormat: odf-operator.v%s-rhodf
+
+# odf-operator declares no OLM dependencies itself. At runtime it creates the
+# odf-dependencies Subscription in this namespace, at its own version; that
+# InstallPlan brings in the ODF sub-operators (olm.package.required of the
+# odf-dependencies bundle). A second approver approves exactly that plan,
+# right after the main one: the StorageCluster (wave 10) needs ocs-operator's CRDs.
+approver:
+  extra:
+    - namespace: openshift-storage
+      subscription: odf-dependencies
+      csvFromMain: odf-dependencies
+      # exact sub-operator CSVs per version, generated from the catalog
+      # (scripts/olm-dependencies.py or olm-upgrade-analyzer gitops-versions.yaml)
+      dependenciesKey: dependencies
+      # fallback when versions.odf.dependencies is not set (CSV name prefixes,
+      # from the odf-dependencies 4.18 bundle)
+      dependencies:
+        - cephcsi-operator
+        - mcg-operator
+        - ocs-client-operator
+        - ocs-operator
+        - odf-csi-addons-operator
+        - odf-prometheus-operator
+        - recipe
+        - rook-ceph-operator
+      wave: -3

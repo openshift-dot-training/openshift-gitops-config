@@ -1,0 +1,33 @@
+# How clusters join groups. Apply on the hub (or set the labels at import time /
+# in your cluster-provisioning templates). The ManagedCluster name is also the
+# folder name under clusters/.
+
+# cluster-a1: group-a  -> logging, loki, odf, acs, grafana
+apiVersion: cluster.open-cluster-management.io/v1
+kind: ManagedCluster
+metadata:
+  name: cluster-a1
+  labels:
+    platform/group: group-a
+    # optional pins (default: catalog.yaml repos.charts.version / repos.config.revision)
+    # chartsRevision: v0.2.0
+    # configRevision: my-branch
+---
+# cluster-b1: group-b, but WITHOUT portworx and WITH grafana
+#   -> logging, loki, mongodb, dynatrace, grafana
+apiVersion: cluster.open-cluster-management.io/v1
+kind: ManagedCluster
+metadata:
+  name: cluster-b1
+  labels:
+    platform/group: group-b
+    component.platform/portworx: disabled
+    component.platform/grafana: enabled
+---
+# cluster-x1: no group, only trident (replaces the old trident=true label)
+apiVersion: cluster.open-cluster-management.io/v1
+kind: ManagedCluster
+metadata:
+  name: cluster-x1
+  labels:
+    component.platform/trident: enabled

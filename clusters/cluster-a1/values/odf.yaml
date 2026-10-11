@@ -1,0 +1,3 @@
+# cluster-a1 needs bigger disks than the group-a default (2Ti).
+storageCluster:
+  storageSize: 4Ti

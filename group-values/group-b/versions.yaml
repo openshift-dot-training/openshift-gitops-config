@@ -1,0 +1,9 @@
+# group-b operator versions. Only list what differs from components/versions.yaml.
+# A cluster can still override any of these in clusters/<cluster>/main-values.yaml.
+versions:
+  # group-b stays one minor behind on logging
+  logging:  { channel: stable-6.1, version: 6.1.4 }
+  loki:     { channel: stable-6.1, version: 6.1.4 }
+  # Portworx: operator and PX Enterprise must be a certified combination for
+  # the clusters' OpenShift x.y.z - always change both together.
+  portworx: { channel: stable, version: 25.2.1, pxVersion: 3.3.1 }

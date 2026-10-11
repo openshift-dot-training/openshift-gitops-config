@@ -1,0 +1,21 @@
+# Domains that may appear in committed files (a domain allows its subdomains).
+# Only public upstream names: Kubernetes API groups, vendor docs, placeholders.
+# Never add a company/internal domain here - use a placeholder instead.
+
+# placeholders (RFC 2606)
+example.com
+example.net
+example.org
+
+# Kubernetes / operator API groups used in manifests
+coreos.com
+grafana.com
+libopenstorage.org
+
+# public documentation / licenses
+apache.org
+redhat.com
+kubernetes.io
+
+# commit trailers (Co-Authored-By: ...)
+anthropic.com

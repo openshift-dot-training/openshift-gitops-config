@@ -1,0 +1,19 @@
+# Values visible to every component chart on this cluster.
+cluster:
+  name: cluster-a1
+  region: us-east-1
+# Per-cluster version overrides: this cluster is the group-a canary for the
+# next ODF release. Everything not listed keeps the group / default version.
+versions:
+  odf:
+    channel: stable-4.19
+    version: 4.19.1
+    dependencies:
+      - cephcsi-operator.v4.19.1-rhodf
+      - mcg-operator.v4.19.1-rhodf
+      - ocs-client-operator.v4.19.1-rhodf
+      - ocs-operator.v4.19.1-rhodf
+      - odf-csi-addons-operator.v4.19.1-rhodf
+      - odf-prometheus-operator.v4.19.1-rhodf
+      - recipe.v4.19.1-rhodf
+      - rook-ceph-operator.v4.19.1-rhodf

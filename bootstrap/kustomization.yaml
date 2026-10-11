@@ -1,0 +1,11 @@
+# One-time hub setup:  oc apply -k bootstrap/
+# Prereqs: ACM (MultiClusterHub) and OpenShift GitOps installed on the hub.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - managedclustersetbindings.yaml
+  - gitopscluster.yaml
+  - rbac.yaml
+  - appprojects.yaml
+  - root-application.yaml

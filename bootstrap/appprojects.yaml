@@ -1,0 +1,46 @@
+# Project for the generated per-cluster Applications.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform
+  namespace: openshift-gitops
+spec:
+  description: Platform components delivered to managed clusters
+  sourceRepos:
+    - https://git.example.com/CHANGE-ME/openshift-gitops-charts.git
+    - https://git.example.com/CHANGE-ME/openshift-gitops-config.git
+    - https://git.example.com/CHANGE-ME/platform-charts.git     # trident chart
+  destinations:
+    - server: '*'
+      namespace: '*'
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+---
+# Project for the hub catalog itself (in-cluster only).
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform-hub
+  namespace: openshift-gitops
+spec:
+  description: Hub catalog - ApplicationSets and ACM policies
+  sourceRepos:
+    - https://git.example.com/CHANGE-ME/openshift-gitops-charts.git
+    - https://git.example.com/CHANGE-ME/openshift-gitops-config.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: openshift-gitops
+    - server: https://kubernetes.default.svc
+      namespace: platform-policies
+  namespaceResourceWhitelist:
+    - group: argoproj.io
+      kind: ApplicationSet
+    - group: cluster.open-cluster-management.io
+      kind: Placement
+    - group: policy.open-cluster-management.io
+      kind: Policy
+    - group: policy.open-cluster-management.io
+      kind: PlacementBinding
+    - group: policy.open-cluster-management.io
+      kind: PolicySet

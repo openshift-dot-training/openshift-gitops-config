@@ -1,0 +1,15 @@
+# group-b Portworx cluster. The PX Enterprise image follows versions.portworx.pxVersion,
+# so the operator and PX versions are pinned in one place (versions.yaml).
+# Generate the full StorageCluster spec for your version with Portworx Central.
+extraObjects:
+  - apiVersion: core.libopenstorage.org/v1
+    kind: StorageCluster
+    metadata:
+      name: px-cluster
+      namespace: portworx
+      annotations:
+        portworx.io/is-openshift: "true"
+    spec:
+      image: 'portworx/oci-monitor:{{ .Values.versions.portworx.pxVersion }}'
+      customImageRegistry: registry.example.com/CHANGE-ME
+      imagePullPolicy: IfNotPresent

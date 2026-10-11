@@ -1,0 +1,35 @@
+# Registers managed clusters into the openshift-gitops Argo CD instance.
+# GitOpsCluster creates one Argo CD cluster secret per selected ManagedCluster,
+# carrying the ManagedCluster labels (platform/group, component.platform/*,
+# chartsRevision, configRevision) that the ApplicationSet cluster generators
+# select on. Only clusters that belong to a group or opted into a component are
+# registered.
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: gitops-clusters
+  namespace: openshift-gitops
+spec:
+  clusterSets:
+    - global
+  tolerations:
+    - key: cluster.open-cluster-management.io/unreachable
+      operator: Exists
+    - key: cluster.open-cluster-management.io/unavailable
+      operator: Exists
+  # No predicates: every cluster in the set is registered; the ApplicationSets
+  # decide what each one receives. Add a predicate here to restrict it.
+---
+apiVersion: apps.open-cluster-management.io/v1beta1
+kind: GitOpsCluster
+metadata:
+  name: gitops-clusters
+  namespace: openshift-gitops
+spec:
+  argoServer:
+    cluster: local-cluster
+    argoNamespace: openshift-gitops
+  placementRef:
+    apiVersion: cluster.open-cluster-management.io/v1beta1
+    kind: Placement
+    name: gitops-clusters

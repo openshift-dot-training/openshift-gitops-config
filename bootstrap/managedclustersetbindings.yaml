@@ -1,0 +1,17 @@
+# Let Placements in these namespaces select clusters from the "global" set.
+# Replace/add cluster sets to match acm.clusterSets in the hub chart values.
+apiVersion: cluster.open-cluster-management.io/v1beta2
+kind: ManagedClusterSetBinding
+metadata:
+  name: global
+  namespace: openshift-gitops
+spec:
+  clusterSet: global
+---
+apiVersion: cluster.open-cluster-management.io/v1beta2
+kind: ManagedClusterSetBinding
+metadata:
+  name: global
+  namespace: platform-policies
+spec:
+  clusterSet: global

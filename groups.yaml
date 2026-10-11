@@ -1,0 +1,33 @@
+# =============================================================================
+#  CLUSTER GROUPS  ->  COMPONENTS
+#  This is the single file you edit to decide "what runs where".
+#
+#  A cluster joins a group with ONE label on its ACM ManagedCluster:
+#      platform/group=<group-name>
+#
+#  Per-cluster exceptions (no need to create a new group):
+#      component.platform/<component>=enabled    -> add a component to this cluster
+#      component.platform/<component>=disabled   -> remove a component from this cluster
+#
+#  The hub chart (openshift-gitops-charts: charts/platform-catalog) reads this
+#  file with catalog.yaml and generates, for every
+#  component, an ApplicationSet (Argo CD) and a Placement + Policy (ACM) that
+#  select exactly the same clusters.
+# =============================================================================
+
+# Installed on EVERY cluster that has a platform/group label (any group).
+common:
+  - logging
+  - loki
+
+# Group-specific components. Component names must exist in
+# catalog.yaml -> components.
+groups:
+  group-a:
+    - odf
+    - acs
+    - grafana
+  group-b:
+    - mongodb
+    - dynatrace
+    - portworx
