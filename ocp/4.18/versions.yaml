@@ -1,0 +1,23 @@
+# Versions of the operators pinned to the OpenShift release
+# (catalog.yaml versionPolicy: ocp) for clusters on OpenShift 4.18. Clusters
+# pick this file by the openshiftVersion-major-minor label ACM sets on them,
+# so a cluster upgraded to another release gets that release's file.
+# Generated from redhat-operator-index:v4.18 (scripts/olm-dependencies.py or
+# olm-upgrade-analyzer gitops-versions.yaml).
+versions:
+  odf:
+    channel: stable-4.18
+    version: 4.18.3
+    dependencies:
+      - cephcsi-operator.v4.18.3-rhodf
+      - mcg-operator.v4.18.3-rhodf
+      - ocs-client-operator.v4.18.3-rhodf
+      - ocs-operator.v4.18.3-rhodf
+      - odf-csi-addons-operator.v4.18.3-rhodf
+      - odf-prometheus-operator.v4.18.3-rhodf
+      - recipe.v4.18.3-rhodf
+      - rook-ceph-operator.v4.18.3-rhodf
+  nmstate:
+    channel: stable
+    version: 4.18.0-202506020833
+    csv: kubernetes-nmstate-operator.4.18.0-202506020833

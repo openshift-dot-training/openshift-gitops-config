@@ -1,33 +1,58 @@
 # =============================================================================
-#  CLUSTER GROUPS  ->  COMPONENTS
-#  This is the single file you edit to decide "what runs where".
+#  GROUPS -> COMPONENTS
+#  A group is a set of ACM Placement filters. Any combination of:
+#    clusterSets     ManagedClusterSets (must be listed in catalog.yaml acm.clusterSets)
+#    labelSelector   ManagedCluster labels: yours (e.g. platform/group) or the
+#                    ones ACM sets on every cluster (openshiftVersion-major-minor,
+#                    cloud, vendor, name, ...)
+#    claimSelector   ClusterClaims (platform.open-cluster-management.io,
+#                    region.open-cluster-management.io, ...)
+#  A component is installed on the clusters of every group listing it (the
+#  groups are OR-ed); common components on the clusters of every group.
+#  A cluster may match several groups; it gets the union of their components.
 #
-#  A cluster joins a group with ONE label on its ACM ManagedCluster:
-#      platform/group=<group-name>
-#
-#  Per-cluster exceptions (no need to create a new group):
+#  Per-cluster exceptions, on the ManagedCluster:
 #      component.platform/<component>=enabled    -> add a component to this cluster
 #      component.platform/<component>=disabled   -> remove a component from this cluster
 #
-#  The hub chart (openshift-gitops-charts: charts/platform-catalog) reads this
-#  file with catalog.yaml and generates, for every
-#  component, an ApplicationSet (Argo CD) and a Placement + Policy (ACM) that
-#  select exactly the same clusters.
+#  The hub chart (openshift-gitops-charts: charts/platform-catalog) turns this
+#  into one ACM Placement per component, which feeds its ApplicationSet and
+#  its health Policy.
 # =============================================================================
 
-# Installed on EVERY cluster that has a platform/group label (any group).
+# Installed on the clusters of every group below.
 common:
   - logging
   - loki
 
-# Group-specific components. Component names must exist in
-# catalog.yaml -> components.
 groups:
+  # Groups by a label you set when importing or creating the cluster.
   group-a:
-    - odf
-    - acs
-    - grafana
+    labelSelector:
+      matchLabels:
+        platform/group: group-a
+    components:
+      - odf
+      - acs
+      - grafana
+
   group-b:
-    - mongodb
-    - dynatrace
-    - portworx
+    labelSelector:
+      matchLabels:
+        platform/group: group-b
+    components:
+      - mongodb
+      - dynatrace
+      - portworx
+
+  # Groups by what ACM reports about the cluster: every bare-metal cluster
+  # (ClusterClaim) gets nmstate, whatever group label it carries.
+  baremetal:
+    claimSelector:
+      matchExpressions:
+        - key: platform.open-cluster-management.io
+          operator: In
+          values:
+            - BareMetal
+    components:
+      - nmstate

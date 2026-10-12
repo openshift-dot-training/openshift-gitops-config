@@ -3,18 +3,24 @@
 #
 #   1. YAML files use the .yaml extension (no .yml)
 #   2. every YAML file outside Helm templates/ parses
-#   3. every catalog component on the default chart has components/<name>/values.yaml,
-#      every versions.yaml entry names a catalog component, a group that sets a
-#      version also sets its own dependencies (when the defaults have some), and no two
-#      components share an operator namespace (OLM resolves a namespace as one
-#      unit, so one InstallPlan could mix operators)
-#   4. the hub chart renders with catalog.yaml + groups.yaml (fails on unknown
-#      components); bootstrap/root-application.yaml uses the same charts tag as
-#      catalog.yaml
-#   5. every component renders through its chart for each group it belongs to,
-#      and for every cluster folder that overrides it
-#   (4 and 5 need openshift-gitops-charts: $CHARTS_DIR or ../openshift-gitops-charts)
-#   6. versionPolicy: ocp components have a version of the level's ocp release
+#   3. catalog consistency: every component on the default chart has
+#      components/<name>/values.yaml; every versions entry names a catalog
+#      component; a group-values file that sets a version also sets its own
+#      dependencies (when the defaults have some); no two components share an
+#      operator namespace (OLM resolves a namespace as one unit)
+#   4. OpenShift-pinned operators (catalog.yaml versionPolicy: ocp): each
+#      ocp/<x.y>/versions.yaml holds only pinned operators, at a version of that
+#      release, and a version for every pinned operator; pinned operators appear
+#      in no other versions file except cluster overrides
+#   5. bootstrap: the charts tag equals catalog.yaml repos.charts.version; every
+#      acm.clusterSets entry has a ManagedClusterSetBinding in openshift-gitops
+#      and platform-policies
+#   6. the hub chart renders with catalog.yaml + groups.yaml (refuses unknown
+#      components, groups without filters, unbound clusterSets)
+#   7. every component renders for each value layer that applies to it: the
+#      defaults, each group-values/<g>, each ocp/<x.y> (pinned operators) and
+#      each cluster folder that overrides it
+#   (6 and 7 need openshift-gitops-charts: $CHARTS_DIR or ../openshift-gitops-charts)
 #
 # Needs yq (mikefarah v4) and helm 3. A missing tool is a warning, unless
 # REQUIRE_TOOLS=1 (set in CI), where it is an error.
@@ -63,7 +69,7 @@ if (( have_yq )); then
   [[ -n $dup ]] && err "operator namespace shared by several components: $(tr '\n' ' ' <<<"$dup")"
   # versions entries must name catalog components
   catalog_keys=$(yq '.components | keys | .[]' "$catalog_file")
-  for f in components/versions.yaml group-values/*/versions.yaml; do
+  for f in components/versions.yaml group-values/*/versions.yaml ocp/*/versions.yaml clusters/*/main-values.yaml; do
     [[ -f $f ]] || continue
     for c in $(yq '.versions // {} | keys | .[]' "$f"); do
       grep -qx "$c" <<<"$catalog_keys" || err "$f: versions.$c is not a component in $catalog_file"
@@ -82,34 +88,37 @@ if (( have_yq )); then
 fi
 
 if (( have_yq )); then
-  # versionPolicy: ocp - the operator version follows the OpenShift release:
-  # its x.y must equal the effective ocp of the level (defaults, each group,
-  # each cluster folder for the components it overrides)
+  # 4. operators pinned to the OpenShift release
   pinned=$(yq '.components | to_entries | .[] | select(.value.versionPolicy == "ocp") | .key' "$catalog_file")
-  check_pinned() { # <label> <merged yaml> <component>...
-    local label=$1 merged=$2; shift 2
-    local ocp ver
-    ocp=$(yq '.ocp // ""' <<<"$merged")
-    for c in "$@"; do
-      ver=$(yq ".versions.\"$c\".version // \"\"" <<<"$merged")
-      [[ -z $ver ]] && continue
-      [[ -n $ocp ]] || { err "$label: $c is pinned to the OpenShift release but no ocp: is set"; continue; }
-      [[ $ver == "$ocp".* ]] || err "$label: $c $ver does not match ocp $ocp (versionPolicy: ocp in $catalog_file)"
+  releases=$(find ocp -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null | sort -V || true)
+  [[ -n $pinned && -z $releases ]] && err "pinned components ($(tr '\n' ' ' <<<"$pinned")) but no ocp/<x.y>/versions.yaml"
+  for r in $releases; do
+    f=ocp/$r/versions.yaml
+    [[ $r =~ ^[0-9]+\.[0-9]+$ ]] || err "ocp/$r: the folder name must be an OpenShift release x.y"
+    [[ -f $f ]] || { err "ocp/$r: versions.yaml missing"; continue; }
+    for c in $(yq '.versions // {} | keys | .[]' "$f"); do
+      grep -qx "$c" <<<"$pinned" || err "$f: $c is not versionPolicy: ocp in $catalog_file - independent versions go to components/ or group-values/"
+      v=$(yq ".versions.\"$c\".version // \"\"" "$f")
+      [[ $v == "$r".* ]] || err "$f: $c ${v:-<no version>} is not an OpenShift $r version"
     done
-  }
-  merge() { yq ea '. as $i ireduce ({}; . * $i)' "$@"; }
-  check_pinned components/versions.yaml "$(merge components/versions.yaml)" $pinned
-  for g in $(yq '.groups | keys | .[]' groups.yaml); do
-    gf=group-values/$g/versions.yaml; [[ -f $gf ]] || gf=/dev/null
-    members=$(yq ".common[], .groups.\"$g\"[]" groups.yaml)
-    check_pinned "group $g" "$(merge components/versions.yaml "$gf")" $(comm -12 <(sort <<<"$pinned") <(sort <<<"$members"))
+    for c in $pinned; do
+      [[ -n $(yq ".versions.\"$c\".version // \"\"" "$f") ]] || err "$f: no version for $c - clusters on OpenShift $r could not install it"
+    done
   done
-  for d in clusters/*/; do
-    f=${d%/}/main-values.yaml; [[ -f $f ]] || continue
-    own=$(yq '.versions // {} | keys | .[]' "$f")
-    check_pinned "$f" "$(merge components/versions.yaml "$f")" $(comm -12 <(sort <<<"$pinned") <(sort <<<"$own"))
+  for f in components/versions.yaml group-values/*/versions.yaml; do
+    [[ -f $f ]] || continue
+    for c in $pinned; do
+      [[ $(yq ".versions.\"$c\" // \"\"" "$f") == "" ]] || err "$f: $c is pinned to the OpenShift release - its versions belong in ocp/<x.y>/versions.yaml"
+    done
   done
 
+  # 5. bootstrap
+  for set in $(yq '.acm.clusterSets[]' "$catalog_file"); do
+    for ns in openshift-gitops platform-policies; do
+      n=$(yq ea "[select(.kind == \"ManagedClusterSetBinding\" and .metadata.namespace == \"$ns\" and .spec.clusterSet == \"$set\")] | length" bootstrap/managedclustersetbindings.yaml)
+      [[ $n -ge 1 ]] || err "bootstrap/managedclustersetbindings.yaml: no binding of clusterSet $set in $ns"
+    done
+  done
   # bootstrap renders the hub chart at the same tag the clusters use
   want=$(yq '.repos.charts.version' "$catalog_file")
   got=$(yq '.spec.sources[] | select(.path == "charts/platform-catalog") | .targetRevision' bootstrap/root-application.yaml)
@@ -124,34 +133,42 @@ fi
 
 if (( have_helm && have_yq )); then
   tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
-  # 4. hub chart
+  # 6. hub chart
   helm template platform-catalog "$CHARTS_DIR/charts/platform-catalog" -f "$catalog_file" -f groups.yaml \
     >"$tmp/hub.yaml" 2>"$tmp/err" || err "hub chart: $(cat "$tmp/err")"
 
-  # 5. each component x each of its groups (only charts in this repo)
+  # 7. each component for each value layer that applies to it (charts in openshift-gitops-charts)
+  render() { # <component> <label> <values files...>
+    local c=$1 label=$2; shift 2
+    local args=()
+    for f in "$@"; do [[ -f $f ]] && args+=(-f "$f"); done
+    helm template "$c" "$CHARTS_DIR/$chart" -n "$ns" "${args[@]}" >/dev/null 2>"$tmp/err" \
+      || err "$c ($label): $(cat "$tmp/err")"
+  }
   for c in $(yq '.components | keys | .[]' "$catalog_file"); do
     chart=$(yq ".components.\"$c\".chart // \"$default_chart\"" "$catalog_file")
     [[ -d $CHARTS_DIR/$chart && -z $(yq ".components.\"$c\".repoURL // \"\"" "$catalog_file") ]] || continue
     ns=$(yq ".components.\"$c\".namespace" "$catalog_file")
-    groups=$(yq ".groups | to_entries | .[] | select(.value[] == \"$c\") | .key" groups.yaml)
-    for g in _none $groups; do
-      args=(-f components/versions.yaml)
-      [[ -f components/$c/values.yaml ]] && args+=(-f "components/$c/values.yaml")
-      [[ -f group-values/$g/versions.yaml ]] && args+=(-f "group-values/$g/versions.yaml")
-      [[ -f group-values/$g/$c.yaml ]] && args+=(-f "group-values/$g/$c.yaml")
-      helm template "$c" "$CHARTS_DIR/$chart" -n "$ns" "${args[@]}" >/dev/null 2>"$tmp/err" \
-        || err "$c (group $g): $(cat "$tmp/err")"
+    base=(components/versions.yaml "components/$c/values.yaml")
+    if grep -qx "$c" <<<"$pinned"; then
+      layers=(); for r in $releases; do layers+=("ocp/$r"); done
+    else
+      layers=(defaults); for d in group-values/*/; do [[ -d $d ]] && layers+=("${d%/}"); done
+    fi
+    for l in "${layers[@]}"; do
+      case $l in
+        ocp/*) render "$c" "$l" "${base[@]}" "$l/versions.yaml" ;;
+        group-values/*) render "$c" "$l" "${base[@]}" "$l/versions.yaml" "$l/$c.yaml" ;;
+        *) render "$c" "$l" "${base[@]}" ;;
+      esac
     done
-    # every cluster folder that overrides this component (main-values versions or values/<c>.yaml)
+    # cluster folders overriding this component (pinned ones on the newest release folder)
+    newest=$(tail -1 <<<"$releases")
     for d in clusters/*/; do
-      cl=$(basename "$d")
+      d=${d%/}
       [[ -f $d/values/$c.yaml || $(yq ".versions.\"$c\" // \"\"" "$d/main-values.yaml" 2>/dev/null) != "" ]] || continue
-      args=(-f components/versions.yaml)
-      [[ -f components/$c/values.yaml ]] && args+=(-f "components/$c/values.yaml")
-      [[ -f $d/main-values.yaml ]] && args+=(-f "$d/main-values.yaml")
-      [[ -f $d/values/$c.yaml ]] && args+=(-f "$d/values/$c.yaml")
-      helm template "$c" "$CHARTS_DIR/$chart" -n "$ns" "${args[@]}" >/dev/null 2>"$tmp/err" \
-        || err "$c (cluster $cl): $(cat "$tmp/err")"
+      extra=(); grep -qx "$c" <<<"$pinned" && extra=("ocp/$newest/versions.yaml")
+      render "$c" "$d" "${base[@]}" "${extra[@]}" "$d/main-values.yaml" "$d/values/$c.yaml"
     done
   done
 fi

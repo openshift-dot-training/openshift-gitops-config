@@ -5,9 +5,10 @@
 #  clusters/ hold the values and exact versions.
 #  Every field: see that chart's values.yaml. One field is read only by this
 #  repository's scripts/validate.sh:
-#    versionPolicy: ocp   the operator version follows the OpenShift release
-#                         (x.y of versions.<name>.version == the level's ocp:)
-#                         - default: independent of the OpenShift release
+#    versionPolicy: ocp   the operator version follows the OpenShift release:
+#                         its versions live in ocp/<x.y>/versions.yaml only,
+#                         picked by the cluster's openshiftVersion-major-minor
+#                         label (set by ACM) - default: independent
 # =============================================================================
 
 repos:
@@ -16,14 +17,29 @@ repos:
     # charts tag for every cluster; a cluster can test another one with the
     # ManagedCluster label chartsRevision=<tag>. Keep bootstrap/root-application.yaml
     # on the same tag (scripts/validate.sh checks it).
-    version: v0.1.0
+    version: v0.2.0
   config:
     url: https://git.example.com/CHANGE-ME/openshift-gitops-config.git
     revision: main
 
 acm:
+  # ManagedClusterSets the Placements may select from; bootstrap binds each one
+  # to the openshift-gitops and platform-policies namespaces.
   clusterSets:
     - global
+
+# Value layers (later wins). {label:<key>} is any ManagedCluster label,
+# including the ones ACM sets; missing files are ignored.
+valueFiles:
+  - components/versions.yaml
+  - components/{component}/values.yaml
+  # values by group label (optional layer, for clusters carrying platform/group)
+  - group-values/{label:platform/group}/versions.yaml
+  - group-values/{label:platform/group}/{component}.yaml
+  # operators pinned to the OpenShift release, chosen by the release ACM reports
+  - ocp/{label:openshiftVersion-major-minor}/versions.yaml
+  - clusters/{cluster}/main-values.yaml
+  - clusters/{cluster}/values/{component}.yaml
 
 components:
   # ---------------- common ----------------

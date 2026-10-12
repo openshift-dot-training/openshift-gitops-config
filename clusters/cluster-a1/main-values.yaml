@@ -2,20 +2,15 @@
 cluster:
   name: cluster-a1
   region: us-east-1
-# This cluster is the group-a canary: it is already on OpenShift 4.19, so the
-# operators pinned to the OpenShift release (versionPolicy: ocp) move with it.
-# Everything not listed keeps the group / default version.
-ocp: "4.19"
+
+# Operators pinned to the OpenShift release follow the cluster by themselves:
+# once ACM reports this cluster on 4.19 (label openshiftVersion-major-minor),
+# it reads ocp/4.19/versions.yaml - no override needed here.
+#
+# Per-cluster version overrides are for independent operators: this cluster is
+# the canary for the next Logging z-stream. Everything not listed keeps the
+# group / default version.
 versions:
-  odf:
-    channel: stable-4.19
-    version: 4.19.1
-    dependencies:
-      - cephcsi-operator.v4.19.1-rhodf
-      - mcg-operator.v4.19.1-rhodf
-      - ocs-client-operator.v4.19.1-rhodf
-      - ocs-operator.v4.19.1-rhodf
-      - odf-csi-addons-operator.v4.19.1-rhodf
-      - odf-prometheus-operator.v4.19.1-rhodf
-      - recipe.v4.19.1-rhodf
-      - rook-ceph-operator.v4.19.1-rhodf
+  logging:
+    channel: stable-6.2
+    version: 6.2.13

@@ -2,15 +2,15 @@
 #  Default operator versions for every cluster. EXAMPLE values - set them to
 #  the exact versions you mirror (olm-upgrade-analyzer decides which).
 #
-#  Precedence (later wins), same keys at every level:
+#  Operators pinned to the OpenShift release (catalog.yaml versionPolicy: ocp)
+#  are NOT here: their versions are in ocp/<x.y>/versions.yaml.
+#
+#  Precedence (later wins), same keys at every level (catalog.yaml valueFiles):
 #    components/versions.yaml                    <- this file (defaults)
-#    group-values/<group>/versions.yaml          <- per group
+#    group-values/<group>/versions.yaml          <- clusters labelled platform/group=<group>
+#    ocp/<x.y>/versions.yaml                     <- pinned operators, by OpenShift release
 #    clusters/<cluster>/main-values.yaml           <- per cluster (versions: block)
 #    clusters/<cluster>/values/<component>.yaml    <- per cluster, one component
-#
-#  ocp: the OpenShift release (x.y) of the clusters at this level. Operators
-#  with versionPolicy: ocp in catalog.yaml must have a version of that release
-#  (scripts/validate.sh); a group or cluster on another release sets its own ocp.
 #
 #  Fields per component:
 #    channel              OLM channel
@@ -26,7 +26,6 @@
 #      -o jsonpath='{range .status.channels[*]}{.name}{" "}{.currentCSV}{"\n"}{end}'
 # =============================================================================
 
-ocp: "4.18"
 # oc client image for the installplan approver Jobs. Airgapped: mirror it with
 # oc-mirror (ImageSetConfiguration -> mirror.additionalImages) and keep the tag
 # within +/-1 minor of the clusters' OpenShift version.
@@ -35,18 +34,6 @@ approver:
 versions:
   logging: {channel: stable-6.2, version: 6.2.3}
   loki: {channel: stable-6.2, version: 6.2.3}
-  odf:
-    channel: stable-4.18
-    version: 4.18.3
-    dependencies:
-      - cephcsi-operator.v4.18.3-rhodf
-      - mcg-operator.v4.18.3-rhodf
-      - ocs-client-operator.v4.18.3-rhodf
-      - ocs-operator.v4.18.3-rhodf
-      - odf-csi-addons-operator.v4.18.3-rhodf
-      - odf-prometheus-operator.v4.18.3-rhodf
-      - recipe.v4.18.3-rhodf
-      - rook-ceph-operator.v4.18.3-rhodf
   acs: {channel: stable, version: 4.7.2}
   grafana: {channel: v5, version: 5.18.0}
   mongodb: {channel: stable, version: 1.32.0}
@@ -54,13 +41,9 @@ versions:
   portworx: {channel: stable, version: 25.2.1, pxVersion: 3.3.1}
   # ACM and the MCE it installs are pinned together (ACM 2.12 <-> MCE 2.7)
   acm: {channel: release-2.12, version: 2.12.3, mceChannel: stable-2.7, mceVersion: 2.7.3}
-  # variant examples (real catalog data, redhat-operator-index v4.18)
+  # variant example (real catalog data, redhat-operator-index v4.18)
   web-terminal:
     channel: fast
     version: 1.13.0
     dependencies:
       - devworkspace-operator.v0.43.0
-  nmstate:
-    channel: stable
-    version: 4.18.0-202506020833
-    csv: kubernetes-nmstate-operator.4.18.0-202506020833

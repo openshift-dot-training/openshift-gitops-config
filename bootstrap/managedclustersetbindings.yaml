@@ -1,5 +1,6 @@
 # Let Placements in these namespaces select clusters from the "global" set.
-# Replace/add cluster sets to match acm.clusterSets in the hub chart values.
+# One binding per set in catalog.yaml acm.clusterSets, in both namespaces
+# (scripts/validate.sh checks it).
 apiVersion: cluster.open-cluster-management.io/v1beta2
 kind: ManagedClusterSetBinding
 metadata:
