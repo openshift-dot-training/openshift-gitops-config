@@ -1,0 +1,13 @@
+# Component defaults (lowest precedence after the chart).
+# Versions (channel, version, csv, dependencies) are NOT set here: see
+# components/versions.yaml, group-values/<group>/versions.yaml and
+# clusters/<cluster>/main-values.yaml (versions: block).
+#
+# Variant: pinned to the OpenShift release (catalog.yaml versionPolicy: ocp);
+# its CSV names have no "v" (kubernetes-nmstate-operator.4.18.0-<build>), so the
+# versions entries carry the exact csv.
+operatorGroup:
+  targetNamespaces:
+    - openshift-nmstate
+subscription:
+  name: kubernetes-nmstate-operator

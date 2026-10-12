@@ -2,8 +2,10 @@
 cluster:
   name: cluster-a1
   region: us-east-1
-# Per-cluster version overrides: this cluster is the group-a canary for the
-# next ODF release. Everything not listed keeps the group / default version.
+# This cluster is the group-a canary: it is already on OpenShift 4.19, so the
+# operators pinned to the OpenShift release (versionPolicy: ocp) move with it.
+# Everything not listed keeps the group / default version.
+ocp: "4.19"
 versions:
   odf:
     channel: stable-4.19

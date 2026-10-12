@@ -24,10 +24,11 @@ metadata:
     component.platform/portworx: disabled
     component.platform/grafana: enabled
 ---
-# cluster-x1: no group, only trident (replaces the old trident=true label)
+# cluster-x1: no group, only the components it opts into
 apiVersion: cluster.open-cluster-management.io/v1
 kind: ManagedCluster
 metadata:
   name: cluster-x1
   labels:
-    component.platform/trident: enabled
+    component.platform/web-terminal: enabled
+    component.platform/nmstate: enabled
