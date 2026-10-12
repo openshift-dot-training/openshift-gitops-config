@@ -3,7 +3,12 @@
 #  chart (openshift-gitops-charts/charts/platform-catalog). WHAT can be
 #  installed; groups.yaml decides WHERE; components/, group-values/ and
 #  clusters/ hold the values and exact versions.
-#  Every field: see that chart's values.yaml.
+#  Every field: see that chart's values.yaml. One field is read only by this
+#  repository's scripts/validate.sh:
+#    versionPolicy: ocp   the operator version follows the OpenShift release:
+#                         its versions live in ocp/<x.y>/versions.yaml only,
+#                         picked by the cluster's openshiftVersion-major-minor
+#                         label (set by ACM) - default: independent
 # =============================================================================
 
 repos:
@@ -12,14 +17,29 @@ repos:
     # charts tag for every cluster; a cluster can test another one with the
     # ManagedCluster label chartsRevision=<tag>. Keep bootstrap/root-application.yaml
     # on the same tag (scripts/validate.sh checks it).
-    version: v0.1.0
+    version: v0.2.0
   config:
     url: https://git.example.com/CHANGE-ME/openshift-gitops-config.git
     revision: main
 
 acm:
+  # ManagedClusterSets the Placements may select from; bootstrap binds each one
+  # to the openshift-gitops and platform-policies namespaces.
   clusterSets:
     - global
+
+# Value layers (later wins). {label:<key>} is any ManagedCluster label,
+# including the ones ACM sets; missing files are ignored.
+valueFiles:
+  - components/versions.yaml
+  - components/{component}/values.yaml
+  # values by group label (optional layer, for clusters carrying platform/group)
+  - group-values/{label:platform/group}/versions.yaml
+  - group-values/{label:platform/group}/{component}.yaml
+  # operators pinned to the OpenShift release, chosen by the release ACM reports
+  - ocp/{label:openshiftVersion-major-minor}/versions.yaml
+  - clusters/{cluster}/main-values.yaml
+  - clusters/{cluster}/values/{component}.yaml
 
 components:
   # ---------------- common ----------------
@@ -36,6 +56,7 @@ components:
   # ---------------- group-a ----------------
   odf:
     namespace: openshift-storage
+    versionPolicy: ocp
     operator:
       name: odf-operator
       namespace: openshift-storage
@@ -74,20 +95,19 @@ components:
     operator:
       name: advanced-cluster-management
       namespace: open-cluster-management
-  # ---------------- migrated from the original trident ApplicationSet ----------------
-  # Not in any group: opt a cluster in with  component.platform/trident=enabled
-  # (or add "trident" to a group in groups.yaml).
-  trident:
-    namespace: trident
-    repoURL: https://git.example.com/CHANGE-ME/platform-charts.git
-    chart: charts/trident
-    clusterManifests: true
-    helmValues: |
-      {{- $platformCatalog := "CHANGE-ME-operator-catalog" }}
-      {{- if eq (index .metadata.labels "local-cluster" | default "false") "true" }}
-      {{- $platformCatalog = "acm-operator" }}
-      {{- end }}
-      catalogSource:
-        name: {{ $platformCatalog }}
-    # Set operator.name / operator.namespace to the Subscription created by the
-    # trident chart to get an ACM health policy for it.
+  # ---------------- variant examples (opt in per cluster) ----------------
+  # OLM dependency in the same InstallPlan: web-terminal requires
+  # devworkspace-operator (versions.web-terminal.dependencies).
+  web-terminal:
+    namespace: web-terminal
+    operator:
+      name: web-terminal
+      namespace: web-terminal
+
+  # Pinned to the OpenShift release, CSV name without "v" (versions.*.csv).
+  nmstate:
+    namespace: openshift-nmstate
+    versionPolicy: ocp
+    operator:
+      name: kubernetes-nmstate-operator
+      namespace: openshift-nmstate

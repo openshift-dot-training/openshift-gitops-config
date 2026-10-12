@@ -1,6 +1,9 @@
-# How clusters join groups. Apply on the hub (or set the labels at import time /
-# in your cluster-provisioning templates). The ManagedCluster name is also the
-# folder name under clusters/.
+# How clusters match groups. Groups (groups.yaml) are ACM Placement filters:
+# some use labels you set (platform/group below, at import time or in your
+# cluster-provisioning templates), others only what ACM sets by itself -
+# ClusterSet membership, labels such as openshiftVersion-major-minor, vendor,
+# cloud, and ClusterClaims such as platform.open-cluster-management.io - which
+# need no action here. The ManagedCluster name is also its folder under clusters/.
 
 # cluster-a1: group-a  -> logging, loki, odf, acs, grafana
 apiVersion: cluster.open-cluster-management.io/v1
@@ -24,10 +27,11 @@ metadata:
     component.platform/portworx: disabled
     component.platform/grafana: enabled
 ---
-# cluster-x1: no group, only trident (replaces the old trident=true label)
+# cluster-x1: no group, only the components it opts into
 apiVersion: cluster.open-cluster-management.io/v1
 kind: ManagedCluster
 metadata:
   name: cluster-x1
   labels:
-    component.platform/trident: enabled
+    component.platform/web-terminal: enabled
+    component.platform/nmstate: enabled

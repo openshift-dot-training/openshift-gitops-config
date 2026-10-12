@@ -6,6 +6,7 @@ resources:
   - namespace.yaml
   - managedclustersetbindings.yaml
   - gitopscluster.yaml
+  - acm-placement.yaml
   - rbac.yaml
   - appprojects.yaml
   - root-application.yaml

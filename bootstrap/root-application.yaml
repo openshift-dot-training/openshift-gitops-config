@@ -14,7 +14,7 @@ spec:
       targetRevision: main
       ref: config
     - repoURL: https://git.example.com/CHANGE-ME/openshift-gitops-charts.git
-      targetRevision: v0.1.0          # keep equal to catalog.yaml repos.charts.version
+      targetRevision: v0.2.0          # keep equal to catalog.yaml repos.charts.version
       path: charts/platform-catalog
       helm:
         valueFiles:

@@ -1,0 +1,20 @@
+# Versions of the operators pinned to the OpenShift release
+# (catalog.yaml versionPolicy: ocp) for clusters on OpenShift 4.19.
+# Generated from redhat-operator-index:v4.19.
+versions:
+  odf:
+    channel: stable-4.19
+    version: 4.19.1
+    dependencies:
+      - cephcsi-operator.v4.19.1-rhodf
+      - mcg-operator.v4.19.1-rhodf
+      - ocs-client-operator.v4.19.1-rhodf
+      - ocs-operator.v4.19.1-rhodf
+      - odf-csi-addons-operator.v4.19.1-rhodf
+      - odf-prometheus-operator.v4.19.1-rhodf
+      - recipe.v4.19.1-rhodf
+      - rook-ceph-operator.v4.19.1-rhodf
+  nmstate:
+    channel: stable
+    version: 4.19.0-202609281351
+    csv: kubernetes-nmstate-operator.4.19.0-202609281351

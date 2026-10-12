@@ -1,0 +1,12 @@
+# Component defaults (lowest precedence after the chart).
+# Versions (channel, version, csv, dependencies) are NOT set here: see
+# components/versions.yaml, group-values/<group>/versions.yaml and
+# clusters/<cluster>/main-values.yaml (versions: block).
+#
+# Variant: OLM dependency in the same InstallPlan. The web-terminal bundle
+# requires devworkspace-operator, so OLM installs both in this namespace with
+# one InstallPlan; the approver accepts exactly versions.web-terminal.dependencies.
+operatorGroup:
+  targetNamespaces: []        # AllNamespaces install mode
+subscription:
+  name: web-terminal
