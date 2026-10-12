@@ -18,22 +18,6 @@ approve operators is described in that repository's README, in its
 | openshift-gitops-charts | how to install an operator (generic charts, approver) | the mechanism changes (tagged releases) |
 | openshift-gitops-config (this one) | what runs where, versions, values | every day: upgrades, new clusters, new groups |
 
-## The problem this solves
-
-The original `trident` ApplicationSet joins two things: a generic chart (from
-the platform repo) and per-cluster values (from `environments/<cluster>.git`).
-That works for one component. It does not answer this question: *which
-clusters get which set of components?*
-
-For example, group A gets ODF, ACS and Grafana. Group B gets MongoDB, Dynatrace
-and Portworx. Both groups get Logging and Loki.
-
-The two-repository split stays the same. Generic charts are in
-openshift-gitops-charts, which plays the role of the original chart
-repository. Values are here, with a folder per cluster under `clusters/`
-instead of one repository per cluster. This repository adds the groups and
-the exact versions.
-
 ## The model: three layers, each defined in one place
 
 | Question | Where it is answered | Who edits it |
@@ -79,7 +63,7 @@ cluster never produces two Applications with the same name. See
 
 ### Values precedence (low → high)
 
-Each generated Application is multi-source, like the original trident one:
+Each generated Application is multi-source:
 
 ```
 olm-operator chart values.yaml                      chart defaults      (charts repo)
@@ -197,6 +181,75 @@ Other things the script and the checks cover:
 - **Fallback.** Without a generated list, the approver falls back to the CSV
   name prefixes in `subscription.dependencies`.
 
+## Variants
+
+Every operator is installed the same way: an exact version, Manual approval,
+and an approver that accepts only that version. What changes between operators
+is how their versions move, what OLM installs with them, and how their CSVs are
+named. Each variant has an example component.
+
+### How the version moves
+
+| Variant | Examples | How it is expressed | What checks it |
+|---|---|---|---|
+| **Independent of the OpenShift release** | `logging`, `loki`, `acs`, `grafana`, `mongodb`, `dynatrace` | `channel` + exact `version`. It changes when you decide, inside OpenShift's support window (usually ±1 minor, `olm.maxOpenShiftVersion`). | olm-upgrade-analyzer plans it. `olm-dependencies.py` warns when the version is not in its channel. |
+| **Pinned to the OpenShift release** | `odf`, `nmstate` (also kubevirt, nfd, local-storage) | `versionPolicy: ocp` in `catalog.yaml`. The version's `x.y` equals the OpenShift release of that level (`ocp:`). | `validate.sh`: version `x.y` == `ocp` for the defaults, every group and every cluster override. |
+| **Certified combination** | `portworx` | The operator version and the operand version (`pxVersion`, used by the StorageCluster) sit in the same `versions` entry and always change together. The certified OpenShift x.y.z + operator + operand matrix is checked outside this repo. | olm-upgrade-analyzer vendor constraints. |
+
+**`ocp:`** is the OpenShift release (`x.y`) of the clusters at a level:
+
+- `components/versions.yaml` sets the fleet default;
+- a group's `versions.yaml` sets it for a group on another release;
+- a cluster's `main-values.yaml` sets it for one cluster (e.g. the canary
+  `clusters/cluster-a1`, already on 4.19).
+
+**Upgrading OpenShift on a group with pinned operators.**
+
+1. olm-upgrade-analyzer plans the path. An EUS jump such as 4.18 → 4.20 needs
+   the 4.19 catalog for pinned operators.
+2. For each step, set the group's `ocp:` and the pinned operators' versions for
+   that release in the group's `versions.yaml`. `validate.sh` refuses a change
+   where they disagree.
+3. Independent operators only move when their supported OpenShift range
+   requires it.
+
+### What OLM installs with the operator
+
+| Variant | Example | How it is expressed |
+|---|---|---|
+| Nothing else (one CSV) | most operators | `dependencies: []` |
+| OLM dependency, same InstallPlan | `web-terminal` → `devworkspace-operator` | exact CSVs in `versions.<name>.dependencies` |
+| Subscription created at runtime, same namespace | `odf` → `odf-dependencies` → 8 sub-operators | `approver.extra` with `csvFromMain` + `dependenciesKey` (`components/odf/values.yaml`) |
+| Subscription created at runtime, other namespace | `acm` → `multicluster-engine` | `approver.extra` with `versionKey` / `channelKey` / `csvFormat` (`components/acm/values.yaml`) |
+
+The dependency lists are generated from the catalog, never written by hand.
+See *OLM dependencies of each version*.
+
+### How the CSV is named
+
+| Variant | Example | How it is expressed |
+|---|---|---|
+| `<package>.v<version>` | `cluster-logging.v6.2.3` | nothing: the default `csvFormat` |
+| vendor suffix | `odf-operator.v4.18.3-rhodf` | `subscription.csvFormat: odf-operator.v%s-rhodf` |
+| other prefix | `portworx-operator.v25.2.1` (package `portworx-certified`) | `subscription.csvFormat: portworx-operator.v%s` |
+| no `v`, build number | `kubernetes-nmstate-operator.4.18.0-202506020833` | exact `csv:` in the `versions` entry |
+
+olm-upgrade-analyzer always writes the exact `csv:`, so its exports work for
+every variant.
+
+### Install mode and approval
+
+| Variant | Example | How it is expressed |
+|---|---|---|
+| own namespace | `odf`, `nmstate` | `operatorGroup.targetNamespaces: [<namespace>]` |
+| all namespaces | `logging`, `loki`, `web-terminal` | `operatorGroup.targetNamespaces: []`, still in a namespace of its own |
+| Manual, exact version (default) | every component | `version` (or `csv`) required |
+| Automatic | none | `installPlanApproval: Automatic`: no approver, no version required |
+
+One operator per namespace is enforced. OLM resolves all Subscriptions in a
+namespace together, so a shared namespace could mix operators in one
+InstallPlan.
+
 ## Layout
 
 ```
@@ -221,9 +274,9 @@ githooks/                       pre-commit, commit-msg, pre-push; allowed-domain
 Prereqs: ACM and OpenShift GitOps installed on the hub.
 
 1. Replace the `CHANGE-ME` placeholders with your values in your copy of the
-   two repositories. They are the repository URLs in `catalog.yaml` (`repos.*`,
-   `components.trident`), `bootstrap/root-application.yaml` and
-   `bootstrap/appprojects.yaml`, and the trident catalog source name. Keep
+   two repositories. They are the repository URLs in `catalog.yaml`
+   (`repos.*`), `bootstrap/root-application.yaml` and
+   `bootstrap/appprojects.yaml`, and the approver image. Keep
    `catalog.yaml` `repos.charts.version` and the charts `targetRevision` in
    `bootstrap/root-application.yaml` on the same tag; `scripts/validate.sh`
    checks this.
@@ -252,6 +305,7 @@ Prereqs: ACM and OpenShift GitOps installed on the hub.
 | Tune a component for one cluster | `clusters/<cluster>/values/<component>.yaml` |
 | Upgrade a component everywhere | `version` (+ `channel`) in `components/versions.yaml` after mirroring it, then `scripts/olm-dependencies.py <component> --write` |
 | Upgrade a component for one group | `group-values/<group>/versions.yaml` |
+| Upgrade OpenShift on a group | set `ocp:` and the new versions of every `versionPolicy: ocp` operator in `group-values/<group>/versions.yaml`, in the same change window as the cluster upgrade (see *Variants*) |
 | Canary a version on one cluster | `versions:` in that cluster's `clusters/<cluster>/main-values.yaml` |
 | Pin a cluster to a charts tag / config branch | labels `chartsRevision` / `configRevision` |
 
@@ -260,10 +314,10 @@ the render fail on purpose:
 `groups.yaml: component "x" (group "y") is not defined in values.components`.
 
 A component does not have to use `charts/olm-operator`. Set `chart:` (and
-`repoURL:` if the chart lives elsewhere) to any Helm chart path. The migrated
-`trident` entry does this: it points at `charts/trident` in your existing chart repo,
-keeps the `catalogSource` logic for local-cluster in `helmValues`, and syncs
-`config/trident` as raw manifests (`clusterManifests: true`).
+`repoURL:` if the chart lives in another repository) to any Helm chart path.
+Use `helmValues` for values computed from cluster labels, and
+`clusterManifests: true` to also sync `clusters/<cluster>/manifests/<component>/`
+as raw manifests. Add the chart repository to `bootstrap/appprojects.yaml`.
 
 ### Removal
 
@@ -329,9 +383,7 @@ with `--no-verify` is still caught.
 ## Assumptions to verify on your hub
 
 - **ManagedCluster labels reach the Argo CD cluster secrets.** The cluster
-  generator matches labels on those secrets. The original trident
-  ApplicationSet already depends on this (it selected on cluster-secret
-  labels), so it should already be true. Check with:
+  generator matches labels on those secrets. Check with:
   `oc get secret -n openshift-gitops -l apps.open-cluster-management.io/acm-cluster=true --show-labels`
 - **OperatorPolicy** (used by the health policies) needs ACM 2.11 or later. On
   older hubs, set `acm.healthPolicies: false`, or supply
@@ -351,7 +403,7 @@ with `--no-verify` is still caught.
   `date`, which the ose-cli image includes.
 - **`helmValues` overrides every value file.** In Argo CD, inline `values` take
   precedence over `valueFiles`. Use it only for computed values (such as the
-  trident catalogSource switch), not for defaults that clusters should be able
+  catalog source chosen from a cluster label), not for defaults that clusters should be able
   to override.
 - **No ordering between components.** For example, Logging may sync before
   Loki. The retry/backoff in `defaults.syncPolicy` makes this converge. Use

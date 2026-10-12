@@ -9,7 +9,6 @@ spec:
   sourceRepos:
     - https://git.example.com/CHANGE-ME/openshift-gitops-charts.git
     - https://git.example.com/CHANGE-ME/openshift-gitops-config.git
-    - https://git.example.com/CHANGE-ME/platform-charts.git     # trident chart
   destinations:
     - server: '*'
       namespace: '*'

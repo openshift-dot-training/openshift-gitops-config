@@ -14,6 +14,7 @@
 #   5. every component renders through its chart for each group it belongs to,
 #      and for every cluster folder that overrides it
 #   (4 and 5 need openshift-gitops-charts: $CHARTS_DIR or ../openshift-gitops-charts)
+#   6. versionPolicy: ocp components have a version of the level's ocp release
 #
 # Needs yq (mikefarah v4) and helm 3. A missing tool is a warning, unless
 # REQUIRE_TOOLS=1 (set in CI), where it is an error.
@@ -81,6 +82,34 @@ if (( have_yq )); then
 fi
 
 if (( have_yq )); then
+  # versionPolicy: ocp - the operator version follows the OpenShift release:
+  # its x.y must equal the effective ocp of the level (defaults, each group,
+  # each cluster folder for the components it overrides)
+  pinned=$(yq '.components | to_entries | .[] | select(.value.versionPolicy == "ocp") | .key' "$catalog_file")
+  check_pinned() { # <label> <merged yaml> <component>...
+    local label=$1 merged=$2; shift 2
+    local ocp ver
+    ocp=$(yq '.ocp // ""' <<<"$merged")
+    for c in "$@"; do
+      ver=$(yq ".versions.\"$c\".version // \"\"" <<<"$merged")
+      [[ -z $ver ]] && continue
+      [[ -n $ocp ]] || { err "$label: $c is pinned to the OpenShift release but no ocp: is set"; continue; }
+      [[ $ver == "$ocp".* ]] || err "$label: $c $ver does not match ocp $ocp (versionPolicy: ocp in $catalog_file)"
+    done
+  }
+  merge() { yq ea '. as $i ireduce ({}; . * $i)' "$@"; }
+  check_pinned components/versions.yaml "$(merge components/versions.yaml)" $pinned
+  for g in $(yq '.groups | keys | .[]' groups.yaml); do
+    gf=group-values/$g/versions.yaml; [[ -f $gf ]] || gf=/dev/null
+    members=$(yq ".common[], .groups.\"$g\"[]" groups.yaml)
+    check_pinned "group $g" "$(merge components/versions.yaml "$gf")" $(comm -12 <(sort <<<"$pinned") <(sort <<<"$members"))
+  done
+  for d in clusters/*/; do
+    f=${d%/}/main-values.yaml; [[ -f $f ]] || continue
+    own=$(yq '.versions // {} | keys | .[]' "$f")
+    check_pinned "$f" "$(merge components/versions.yaml "$f")" $(comm -12 <(sort <<<"$pinned") <(sort <<<"$own"))
+  done
+
   # bootstrap renders the hub chart at the same tag the clusters use
   want=$(yq '.repos.charts.version' "$catalog_file")
   got=$(yq '.spec.sources[] | select(.path == "charts/platform-catalog") | .targetRevision' bootstrap/root-application.yaml)
